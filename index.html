@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foxy's Forest Adventure 🦊</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Comic Sans MS', cursive, sans-serif; background: #87CEEB; }
+        canvas { display: block; }
+        #overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 120px;
+            color: white;
+            text-align: center;
+        }
+        #title {
+            font-size: 4.5rem;
+            font-weight: bold;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.8);
+            margin-bottom: 2rem;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+        #title.show { opacity: 1; }
+        #text {
+            font-size: 2.8rem;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            max-width: 90%;
+            line-height: 1.4;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+        #text.show { opacity: 1; }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            color: white;
+            text-shadow: 2px 2px 4px black;
+        }
+        @media (max-width: 768px) {
+            #title { font-size: 3rem; }
+            #text { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading Foxy's Adventure... 🦊</div>
+    <div id="overlay">
+        <h1 id="title">Foxy's Forest Adventure 🦊</h1>
+        <p id="text"></p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 50, 300);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+
+        const directional = new THREE.DirectionalLight(0xffffff, 1);
+        directional.position.set(10, 20, 10);
+        directional.castShadow = true;
+        directional.shadow.mapSize.width = 2048;
+        directional.shadow.mapSize.height = 2048;
+        scene.add(directional);
+
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(300, 300);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7c59 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -1;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Simple trees
+        function addTree(x, z) {
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(1, 1.2, 8, 8),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+            );
+            trunk.position.set(x, 3, z);
+            trunk.castShadow = true;
+            scene.add(trunk);
+
+            const leaves = new THREE.Mesh(
+                new THREE.ConeGeometry(6, 12, 8),
+                new THREE.MeshStandardMaterial({ color: 0x228B22 })
+            );
+            leaves.position.set(x, 12, z);
+            leaves.castShadow = true;
+            scene.add(leaves);
+        }
+        for (let i = 0; i < 50; i++) {
+            const x = (Math.random() - 0.5) * 200;
+            const z = (Math.random() - 0.5) * 200;
+            if (Math.abs(x) > 10 || Math.abs(z) > 10) addTree(x, z);
+        }
+
+        // Create a cute simple fox using basic shapes (no external model = always works)
+        const fox = new THREE.Group();
+
+        // Body
+        const body = new THREE.Mesh(
+            new THREE.CapsuleGeometry(1.5, 3, 4, 8),
+            new THREE.MeshStandardMaterial({ color: 0xff8c00 }) // orange
+        );
+        body.rotation.z = Math.PI / 2;
+        body.position.set(0, 1, 0);
+        body.castShadow = true;
+        fox.add(body);
+
+        // Head
+        const head = new THREE.Mesh(
+            new THREE.SphereGeometry(1.8, 16, 16),
+            new THREE.MeshStandardMaterial({ color: 0xff8c00 })
+        );
+        head.position.set(2.5, 1.5, 0);
+        head.castShadow = true;
+        fox.add(head);
+
+        // Ears
+        const earGeo = new THREE.ConeGeometry(0.8, 1.5, 8);
+        const earMat = new THREE.MeshStandardMaterial({ color: 0xff8c00 });
+        const leftEar = new THREE.Mesh(earGeo, earMat);
+        leftEar.position.set(2.5, 3, -0.8);
+        leftEar.rotation.x = 0.3;
+        fox.add(leftEar);
+        const rightEar = new THREE.Mesh(earGeo, earMat);
+        rightEar.position.set(2.5, 3, 0.8);
+        rightEar.rotation.x = 0.3;
+        fox.add(rightEar);
+
+        // White parts (cheeks, belly, tail tip)
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const belly = new THREE.Mesh(
+            new THREE.CapsuleGeometry(1.4, 2.8, 4, 8),
+            whiteMat
+        );
+        belly.rotation.z = Math.PI / 2;
+        belly.position.set(0, 1, 0);
+        fox.add(belly);
+
+        const tailTip = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 8, 8),
+            whiteMat
+        );
+        tailTip.position.set(-3.5, 1, 0);
+        fox.add(tailTip);
+
+        // Tail
+        const tail = new THREE.Mesh(
+            new THREE.CapsuleGeometry(1, 3, 4, 8),
+            new THREE.MeshStandardMaterial({ color: 0xff8c00 })
+        );
+        tail.rotation.z = Math.PI / 1.5;
+        tail.position.set(-2.5, 1.5, 0);
+        tail.castShadow = true;
+        fox.add(tail);
+
+        // Eyes
+        const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), eyeMat);
+        leftEye.position.set(3.5, 1.8, -0.8);
+        fox.add(leftEye);
+        const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), eyeMat);
+        rightEye.position.set(3.5, 1.8, 0.8);
+        fox.add(rightEye);
+
+        // Nose
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), eyeMat);
+        nose.position.set(4, 1.2, 0);
+        fox.add(nose);
+
+        // Legs (simple)
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        for (let i = -1; i <= 1; i += 2) {
+            for (let j = -1; j <= 1; j += 2) {
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8), legMat);
+                leg.position.set(i * 1.2, 0, j * 1);
+                leg.castShadow = true;
+                fox.add(leg);
+            }
+        }
+
+        fox.scale.set(0.8, 0.8, 0.8);
+        fox.position.set(0, 0, 0);
+        fox.rotation.y = Math.PI / 4;
+        scene.add(fox);
+
+        // Remove loading text
+        document.getElementById('loading').remove();
+
+        // Animation states
+        let currentState = 'survey'; // survey, walk, run, end_survey
+        let timeInState = 0;
+
+        // Story text
+        const storyTexts = [
+            "Foxy's Forest Adventure 🦊",
+            "Meet Foxy, a curious little fox who loves his forest home.",
+            "He's looking around, enjoying the peaceful morning...",
+            "Time for a gentle walk through the trees!",
+            "Look how fast Foxy can run when he's excited!",
+            "What a wonderful day full of adventure.",
+            "The End — Thanks for watching! 🌳✨"
+        ];
+        const titleEl = document.getElementById('title');
+        const textEl = document.getElementById('text');
+        let textIndex = 0;
+
+        function showText(index) {
+            if (index === 0) {
+                titleEl.classList.add('show');
+                textEl.textContent = '';
+            } else {
+                titleEl.classList.remove('show');
+                textEl.textContent = storyTexts[index];
+                textEl.classList.add('show');
+            }
+        }
+        showText(0);
+
+        // Text timing (matches animation sequence)
+        setTimeout(() => showText(1), 5000);
+        setTimeout(() => showText(2), 15000);
+        setTimeout(() => showText(3), 20000);
+        setTimeout(() => showText(4), 45000);
+        setTimeout(() => showText(5), 70000);
+        setTimeout(() => showText(6), 80000);
+
+        // State change timing (~80 seconds total)
+        setTimeout(() => currentState = 'walk', 15000);
+        setTimeout(() => currentState = 'run', 45000);
+        setTimeout(() => currentState = 'end_survey', 70000);
+
+        // Camera follow
+        function updateCamera() {
+            const offset = new THREE.Vector3(-12, 8, 0);
+            offset.applyQuaternion(fox.quaternion);
+            const targetPos = fox.position.clone().add(offset);
+            camera.position.lerp(targetPos, 0.08);
+
+            const lookAtPos = fox.position.clone().add(new THREE.Vector3(3, 3, 0));
+            camera.lookAt(lookAtPos);
+        }
+
+        // Animation loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            timeInState += delta;
+
+            // Simple animations based on state
+            if (currentState === 'survey' || currentState === 'end_survey') {
+                fox.rotation.y += Math.sin(timeInState * 2) * 0.005; // gentle look around
+            }
+
+            if (currentState === 'walk') {
+                fox.position.z -= 0.08;
+                fox.position.y = Math.abs(Math.sin(timeInState * 8)) * 0.3; // gentle bounce
+                fox.rotation.y = -Math.PI / 4;
+            }
+
+            if (currentState === 'run') {
+                fox.position.z -= 0.25;
+                fox.position.y = Math.abs(Math.sin(timeInState * 20)) * 0.6; // bigger bounce
+                fox.rotation.y = -Math.PI / 4;
+            }
+
+            // Tail wag
+            tail.rotation.z = Math.PI / 1.5 + Math.sin(timeInState * 10) * 0.2;
+
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
